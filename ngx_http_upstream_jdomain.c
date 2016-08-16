@@ -308,7 +308,7 @@ ngx_http_upstream_jdomain(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 	value = cf->args->elts;
 
 	for (i=2; i < cf->args->nelts; i++) {
-		if (ngx_strncmp(value[i].data, "port=", 5) == 0) {
+		if (value[i].len >= 5 && ngx_strncmp(value[i].data, "port=", 5) == 0) {
 			default_port = ngx_atoi(value[i].data+5, value[i].len - 5);
 
 			if ( default_port == NGX_ERROR || default_port < 1 ||
@@ -319,7 +319,7 @@ ngx_http_upstream_jdomain(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 			continue;
 		}
 
-		if (ngx_strncmp(value[i].data, "interval=", 9) == 0) {
+		if (value[i].len >= 9 && ngx_strncmp(value[i].data, "interval=", 9) == 0) {
 			s.len = value[i].len - 9;
 			s.data = &value[i].data[9];
 			
@@ -332,7 +332,7 @@ ngx_http_upstream_jdomain(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 			continue;
 		}
 
-		if (ngx_strncmp(value[i].data, "max_ips=", 8) == 0) {
+		if (value[i].len >= 8 && ngx_strncmp(value[i].data, "max_ips=", 8) == 0) {
 			max_ips = ngx_atoi(value[i].data + 8, value[i].len - 8);
 
 			if ( max_ips == NGX_ERROR || max_ips < 1) {
@@ -342,7 +342,7 @@ ngx_http_upstream_jdomain(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 			continue;
 		}
 
-		if (ngx_strncmp(value[i].data, "retry_off", 9) == 0) {
+		if (value[i].len == 9 && ngx_strncmp(value[i].data, "retry_off", 9) == 0) {
 			retry = 0;
 
 			continue;
