@@ -221,9 +221,19 @@ ngx_http_upstream_jdomain_get_peer(ngx_peer_connection_t *pc, void *data)
 	if(ngx_resolve_name(ctx) != NGX_OK) {
 		ngx_log_error(NGX_LOG_ALERT, pc->log, 0,
 			"upstream_jdomain: resolve name \"%V\" fail", &ctx->name);
+		urcf->resolved_access = ngx_time();
+		urcf->resolved_status = NGX_JDOMAIN_STATUS_DONE;
 	}
 
 assign:
+	/* If the resolution failed during startup or if resolution returned no entries,
+	   fail all requests until it recovers */
+	if (urcf->resolved_num == 0) {
+		ngx_log_error(NGX_LOG_ALERT, pc->log, 0,
+			"upstream_jdomain: no resolved entry for \"%V\" fail", &urcf->resolved_domain);
+		return NGX_ERROR;
+	}
+
 	ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
 		"upstream_jdomain: resolved_num=%ud", urcf->resolved_num); 
 
@@ -370,6 +380,10 @@ ngx_http_upstream_jdomain(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 	urcf->resolved_max_ips = max_ips;
 	urcf->upstream_retry = retry;
 
+	urcf->resolved_num = 0;
+	/*urcf->resolved_index = 0;*/
+	urcf->resolved_access = ngx_time();
+
 	ngx_memzero(&u, sizeof(ngx_url_t));
 	u.url = value[1];
 	u.default_port = (in_port_t) urcf->default_port;
@@ -379,11 +393,18 @@ ngx_http_upstream_jdomain(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 			ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
 				"%s in upstream \"%V\"", u.err, &u.url);
 		}
-	
+
+		/* In case the error is a resolution issue, do not prevent nginx from starting
+			and let the resolution happen again later */
+		const char *rslverr = "host not found";
+		if (strlen(u.err) == strlen(rslverr)
+			&& ngx_strncmp(u.err, rslverr, strlen(rslverr)) == 0) {
+			return NGX_CONF_OK;
+		}
+
 		return NGX_CONF_ERROR;
 	}
 
-	urcf->resolved_num = 0;
 	for(i = 0; i < u.naddrs ;i++){
 		paddr = &urcf->peers[urcf->resolved_num];
 		paddr->sockaddr = *(struct sockaddr*)u.addrs[i].sockaddr;
@@ -396,8 +417,6 @@ ngx_http_upstream_jdomain(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 		if( urcf->resolved_num >= urcf->resolved_max_ips)
 			break;
 	}
-	/*urcf->resolved_index = 0;*/
-	urcf->resolved_access = ngx_time();
 
 	return NGX_CONF_OK;
 
